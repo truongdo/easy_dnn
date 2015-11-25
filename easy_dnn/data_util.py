@@ -119,9 +119,6 @@ def pad_eos(x_batch, y_batch, EOS):
     for i in xrange(len(x_batch)):
         num = max_len - len(x_batch[i])
         if num:
-            print(y_batch[i])
-            print(y_batch[i + 1])
-            print('after')
             if isinstance(EOS[0], int):
                 inp_pad_array = np.ndarray((num, ), dtype=np.int32)
                 inp_pad_array.fill(EOS[0])
@@ -139,9 +136,6 @@ def pad_eos(x_batch, y_batch, EOS):
                 tgt_pad_array = np.tile(EOS[1], num)
                 tgt_pad_array.shape = (num, EOS[1].size)
                 y_batch[i] = np.append(y_batch[i], tgt_pad_array, axis=0)
-            print(y_batch[i])
-            print(y_batch[i + 1])
-            exit(1)
 
 
 def data_multi_row_spliter(dataset, batchsize, n_epoch, EOS=None):

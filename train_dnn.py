@@ -40,7 +40,11 @@ def setup_training(nnet_model, opts):
     else:
         misc.error('Loss function %s is not supported!' % opts.loss_function)
 
-    optimizer = optimizers.SGD(lr=opts.lr)
+    if opts.momentum is not None:
+        optimizer = optimizers.MomentumSGD(lr=opts.lr, momentum=opts.momentum)
+    else:
+        optimizer = optimizers.SGD(lr=opts.lr)
+
     optimizer.setup(nnet_model)
     optimizer.add_hook(chainer.optimizer.GradientClipping(opts.grad_clip))
     return optimizer, model

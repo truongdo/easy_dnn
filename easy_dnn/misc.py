@@ -72,6 +72,8 @@ def get_opts():
             help='Start learning rate decay when improvment is small than this number (Default 0.001)')
     parser.add_option('--lr-stop', dest='lr_stop', default=0.0000001, type=float,
             help='Early stopping when the learning rate falls below this threshold. (Default 0.0000001)')
+    parser.add_option('--momentum', dest='momentum', default=None, type=float,
+            help='Momentum (Default None)')
     parser.add_option('--gpu', dest='gpu', default=None, type=int,
             help='Use GPU (GPU ID)')
     parser.add_option('--eos-pad', dest='eos_pad', default=None,
