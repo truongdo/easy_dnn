@@ -2,5 +2,4 @@
 */*.pyc
 */*/*.pyc
 graph.dot
-.sass-cache
 _site
