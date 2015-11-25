@@ -41,6 +41,7 @@ if [[ $stage -le 1 ]]; then
     --grad-clip="5" \
     --random-seed="0" --n-epoch="3" --batch-size="8" --bprop-len="10" \
     --forget-on-new-utt \
+    --eos-pad='7057;2'
     --save-model="$dir" || exit 1
 
   #python segmenter.py --model-in="$dir" $lang $decode_data

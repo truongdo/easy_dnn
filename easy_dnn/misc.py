@@ -1,5 +1,8 @@
-import inspect, logging
+import inspect
+import logging
 import optparse
+import numpy as np
+
 
 def debug(message):
     "Automatically log the current function details."
@@ -71,6 +74,8 @@ def get_opts():
             help='Early stopping when the learning rate falls below this threshold. (Default 0.0000001)')
     parser.add_option('--gpu', dest='gpu', default=None, type=int,
             help='Use GPU (GPU ID)')
+    parser.add_option('--eos-pad', dest='eos_pad', default=None,
+            help='Padding (might only meaningful in LSTM training)')
     parser.add_option('--batch-size', dest='batchsize', default=10, type=int,
             help='Batch size (Default 10)')
     parser.add_option('--loss-func', dest='loss_function', default='cross_entropy',
@@ -100,3 +105,41 @@ def get_opts():
     parser.add_option('--save-model', dest='fname_out_model', default=None,
             help='Save model path')
     return parser.parse_args()
+
+
+def get_pading(pad_info):
+    if pad_info:
+        inp_pad, tgt_pad = pad_info.split(';')
+        if ',' in inp_pad:
+            inp_pad = np.fromstring(inp_pad, dtype=np.float32, sep=',')
+        else:
+            if inp_pad.isdigit():
+                inp_pad = int(inp_pad)
+            else:
+                inp_pad = float(inp_pad)
+        if ',' in tgt_pad:
+            tgt_pad = np.fromstring(tgt_pad, dtype=np.float32, sep=',')
+        else:
+            if tgt_pad.isdigit():
+                tgt_pad = int(tgt_pad)
+            else:
+                tgt_pad = float(tgt_pad)
+        return (inp_pad, tgt_pad)
+    else:
+        return None
+
+
+if __name__ == "__main__":
+    pad = get_pading(None)
+    assert pad is None
+    pad = get_pading('1;1')
+    assert pad == (1, 1)
+    pad = get_pading('1;1,2,3')
+    assert pad[0] == 1
+    assert (pad[1] == np.array([1, 2, 3])).all()
+    pad = get_pading('1,2,3;4')
+    assert (pad[0] == np.array([1, 2, 3])).all()
+    assert pad[1] == 4
+    pad = get_pading('1,2,3;4,5,6')
+    assert (pad[0] == np.array([1, 2, 3])).all()
+    assert (pad[1] == np.array([4, 5, 6])).all()

@@ -65,19 +65,17 @@ def load_data(fname_input):
 
     inp, tgt = [], []
 
-    # don't support multi row data in float mode
-    if inp_type == np.int32 and tgt_type == np.int32:
-        start, end = 0, 0
-        for line in codecs.open(fname_input, 'r', 'utf-8'):
-            line = line.strip()
-            if not line:
-                inp_row = tmp_inp[start:end]
-                tgt_row = tmp_tgt[start:end]
-                inp.append(inp_row)
-                tgt.append(tgt_row)
-                start = end
-            else:
-                end += 1
+    start, end = 0, 0
+    for line in codecs.open(fname_input, 'r', 'utf-8'):
+        line = line.strip()
+        if not line:
+            inp_row = tmp_inp[start:end]
+            tgt_row = tmp_tgt[start:end]
+            inp.append(inp_row)
+            tgt.append(tgt_row)
+            start = end
+        else:
+            end += 1
 
     if not inp:  # In case there is no empty line in the data file, treat it as one_row data
         inp = [tmp_inp]
@@ -121,22 +119,38 @@ def pad_eos(x_batch, y_batch, EOS):
     for i in xrange(len(x_batch)):
         num = max_len - len(x_batch[i])
         if num:
-            inp_pad_array = np.ndarray((num, ), dtype=np.int32)
-            inp_pad_array.fill(EOS[0])
-            tgt_pad_array = np.ndarray((num, ), dtype=np.int32)
-            tgt_pad_array.fill(EOS[1])
+            print(y_batch[i])
+            print(y_batch[i + 1])
+            print('after')
+            if isinstance(EOS[0], int):
+                inp_pad_array = np.ndarray((num, ), dtype=np.int32)
+                inp_pad_array.fill(EOS[0])
+                x_batch[i] = np.append(x_batch[i], inp_pad_array)
+            else:
+                inp_pad_array = np.tile(EOS[0], num)
+                inp_pad_array.shape = (num, EOS[0].size)
+                x_batch[i] = np.append(x_batch[i], inp_pad_array, axis=0)
 
-            x_batch[i] = np.append(x_batch[i], inp_pad_array)
-            y_batch[i] = np.append(y_batch[i], tgt_pad_array)
+            if isinstance(EOS[1], int):
+                tgt_pad_array = np.ndarray((num, ), dtype=np.int32)
+                tgt_pad_array.fill(EOS[1])
+                y_batch[i] = np.append(y_batch[i], tgt_pad_array)
+            else:
+                tgt_pad_array = np.tile(EOS[1], num)
+                tgt_pad_array.shape = (num, EOS[1].size)
+                y_batch[i] = np.append(y_batch[i], tgt_pad_array, axis=0)
+            print(y_batch[i])
+            print(y_batch[i + 1])
+            exit(1)
 
 
 def data_multi_row_spliter(dataset, batchsize, n_epoch, EOS=None):
     import copy
-    import time
+
     def chunks(l, n):
         """Yield successive n-sized chunks from l."""
         for i in xrange(0, len(l), n):
-            yield l[i:i+n]
+            yield l[i:i + n]
 
     sortedRes = sorted(zip(dataset['input'], dataset['target']), key=lambda x: x[0].size)
     x_data = [x[0] for x in sortedRes]
@@ -151,6 +165,7 @@ def data_multi_row_spliter(dataset, batchsize, n_epoch, EOS=None):
             iter_idx += 1
             done_percentage = int(100 * float(iter_idx) / iter_per_epoch)
             # padding some data to make the x_batch_row has the same size with batchsize
+            # this often happens at the last chunk
             num = batchsize - len(n_row_of_x)
             for x in xrange(num):
                 n_row_of_x.append(copy.copy(n_row_of_x[0]))
@@ -178,4 +193,3 @@ def data_spliter(dataset, batchsize=1, n_epoch=1, EOS=None):
         return data_one_row_spliter(dataset, batchsize, n_epoch)
     else:
         return data_multi_row_spliter(dataset, batchsize, n_epoch, EOS=EOS)
-

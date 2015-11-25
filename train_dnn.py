@@ -15,14 +15,14 @@ from chainer import computational_graph as c
 import easy_dnn.data_util as data_util
 from chainer import cuda
 import chainer
-from easy_dnn.misc import error, get_opts, f_measure
+import easy_dnn.misc as misc
 import chainer.links as L
 import chainer.functions as F
 from chainer import Variable
 import numpy as np
 import sys
 
-opts, args = get_opts()
+opts, args = misc.get_opts()
 xp = cuda.cupy if opts.gpu >= 0 else np
 
 if opts.random_seed is not None:
@@ -38,7 +38,7 @@ def setup_training(nnet_model, opts):
         model = L.Classifier(nnet_model, lossfun=F.mean_squared_error)
         model.compute_accuracy = False
     else:
-        error('Loss function %s is not supported!' % opts.loss_function)
+        misc.error('Loss function %s is not supported!' % opts.loss_function)
 
     optimizer = optimizers.SGD(lr=opts.lr)
     optimizer.setup(nnet_model)
@@ -141,14 +141,17 @@ def train_mode():
         nnet_model = NNET_Model.load(opts.fname_in_model)
 
     trainset = data_util.load_data(opts.fname_train)
+
+    eos_pad = misc.get_pading(opts.eos_pad)
+
     train_data_resource = data_util.data_spliter(trainset, batchsize=opts.batchsize,
-                            n_epoch=opts.n_epoch, EOS=(1, 2))
+                            n_epoch=opts.n_epoch, EOS=eos_pad)
     train_nnet(nnet_model, train_data_resource, opts)
     if opts.fname_test:
         print('====================TESTING=========================')
         test_loss, pred, target = evaluation(nnet_model, opts.fname_test, show_progress=True)
         if 'cross_entropy' in opts.loss_function:
-            f_measure(pred, target)
+            misc.f_measure(pred, target)
         print(' test loss: %.3f' % test_loss)
 
     if opts.fname_out_model:

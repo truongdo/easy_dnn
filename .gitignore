@@ -1,4 +1,6 @@
 *.pyc
+*.swp
+*/.swp
 */*.pyc
 */*/*.pyc
 graph.dot
