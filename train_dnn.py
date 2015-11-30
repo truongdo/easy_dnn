@@ -56,16 +56,11 @@ def print_stats(percentage, epoch, lr, loss):
              percentage, "%.3f" % loss), end='')
 
 
-def evaluation(nnet_model, fname, show_progress=False):
-    dev_model = nnet_model.copy()
-    dev_model.to_cpu()
+def evaluation(model, fname, show_progress=False):
+    model.predictor.forget_history()
+    model.predictor.to_cpu()
     devset = data_util.load_data(fname)
     dev_data_resource = data_util.data_spliter(devset, batchsize=1, n_epoch=1)
-    if opts.loss_function == 'cross_entropy':
-        model = L.Classifier(dev_model)
-    if opts.loss_function == 'mean_squared_error':
-        model = L.Classifier(dev_model, lossfun=F.mean_squared_error)
-        model.compute_accuracy = False
     dev_loss = 0
     pred = []
     target = []
@@ -76,17 +71,19 @@ def evaluation(nnet_model, fname, show_progress=False):
             print_stats(percentage, 0, 0, dev_loss)
         x = Variable(np.asarray(x_batch))
         t = Variable(np.asarray(y_batch))
+
         loss_i = model(x, t)
         target.append(y_batch[0])
         pred.append(model.y.data[0].argmax())
+
         dev_loss = (dev_loss * (dev_idx - 1) + loss_i.data) / dev_idx
         if eos and opts.forget_on_new_utt:
-            dev_model.forget_history()
+            model.predictor.forget_history()
+    model.predictor.forget_history()
     return dev_loss, pred, target
 
 
-def train_nnet(nnet_model, train_data_resource, opts):
-    optimizer, model = setup_training(nnet_model, opts)
+def train_nnet(model, optimizer, train_data_resource, opts):
     if opts.gpu >= 0:
         cuda.check_cuda_available()
         model.to_gpu(opts.gpu)
@@ -96,31 +93,36 @@ def train_nnet(nnet_model, train_data_resource, opts):
     train_loss = 0
     prev_dev_loss = 100000
     prev_percentage = 0
+    dump_graph = True
     for train_idx, x_batch, y_batch, epoch, percentage, eos in train_data_resource:
         if train_idx is None:  # Done one epoch
             if opts.fname_dev:
-                dev_loss, _, _ = evaluation(nnet_model, opts.fname_dev)
+                dev_loss, _, _ = evaluation(model, opts.fname_dev)
+                if xp == cuda.cupy:
+                    model.to_gpu()
                 print(' dev loss: %.3f' % dev_loss, end='')
                 if optimizer.lr < opts.lr_stop:
                     break
                 if prev_dev_loss - dev_loss < opts.start_decay:
                     optimizer.lr *= opts.lr_decay
-                    print('...reducing lr to %.6f' % optimizer.lr)
+                    print('\n...reducing lr to %.6f' % optimizer.lr)
+                prev_dev_loss = dev_loss
             print('')
             continue
         x = Variable(xp.asarray(x_batch))
         t = Variable(xp.asarray(y_batch))
         loss_i = model(x, t)
         accum_loss += loss_i
-        if train_idx == 0:
+        if dump_graph:
             print('Dump graph')
             with open('graph.dot', 'w') as o:
                 o.write(c.build_computational_graph((loss_i, )).dump())
+            dump_graph = False
         if train_idx >= 1:
             train_loss = (train_loss * (train_idx - 1) + loss_i.data) / train_idx
 
         if eos and opts.forget_on_new_utt:
-            nnet_model.forget_history()
+            model.predictor.forget_history()
 
         if eos or (i + 1) % opts.bprop_len == 0:
             model.zerograds()
@@ -143,30 +145,37 @@ def train_mode():
         nnet_model = NNET_Model.parse_structure(opts.nnet_struct)
     elif opts.fname_in_model:
         nnet_model = NNET_Model.load(opts.fname_in_model)
-
+    
     trainset = data_util.load_data(opts.fname_train)
 
     eos_pad = misc.get_pading(opts.eos_pad)
 
     train_data_resource = data_util.data_spliter(trainset, batchsize=opts.batchsize,
                             n_epoch=opts.n_epoch, EOS=eos_pad)
-    train_nnet(nnet_model, train_data_resource, opts)
+
+    optimizer, model = setup_training(nnet_model, opts)
+
+    train_nnet(model, optimizer, train_data_resource, opts)
     if opts.fname_test:
         print('====================TESTING=========================')
-        test_loss, pred, target = evaluation(nnet_model, opts.fname_test, show_progress=True)
+        test_loss, pred, target = evaluation(model, opts.fname_test, show_progress=True)
         if 'cross_entropy' in opts.loss_function:
             misc.f_measure(pred, target)
         print(' test loss: %.3f' % test_loss)
 
     if opts.fname_out_model:
         nnet_model.save(opts.fname_out_model)
-
+    
 
 def test_mode():
-    nnet_model = NNET_Model.load(opts.fname_in_model)
+    loaded_model = NNET_Model.load(opts.fname_in_model)
+    _, model = setup_training(loaded_model, opts)
+    
     print('====================TESTING=========================')
-    test_loss = evaluation(nnet_model, opts.fname_test, show_progress=True)
+    test_loss, pred, target = evaluation(model, opts.fname_test, show_progress=True)
     print(' test loss: %.3f' % test_loss)
+    if 'cross_entropy' in opts.loss_function:
+        misc.f_measure(pred, target)
 
 
 def main():

@@ -13,6 +13,8 @@ from __future__ import print_function
 import chainer
 import six
 import os
+import numpy as np
+import math
 import chainer.links as L
 import chainer.functions as F
 from misc import *
@@ -40,6 +42,13 @@ def parse_component(struct):
         comp = L.EmbedID(in_size, out_size)
     elif 'lstm' in struct:
         in_size, out_size = get_size_info(struct)
+        # init_W = np.random.normal(
+                # 0, 1 * math.sqrt(1. / out_size),
+                # (4 * out_size, in_size)).astype(np.float32)
+        # init_B = np.repeat(np.float32(0), out_size * 4)
+
+        # upward=linear.Linear(in_size, 4 * out_size)
+        # lateral=linear.Linear(out_size, 4 * out_size, nobias=True)
         comp = L.LSTM(in_size, out_size)
     elif 'sigmoid' in struct:
         comp = F.sigmoid
@@ -83,6 +92,7 @@ class NNET_Model(chainer.Chain):
         super(NNET_Model, self).__init__()
         self._comp_holder = component_holder.ComponentHolder()
         self.structure = None
+        self.debug = False
     
     def add_component(self, name, component):
         """ Add new component to the model.
@@ -124,17 +134,22 @@ class NNET_Model(chainer.Chain):
             layer_input.volatile = False
             if hasattr(comp, 'activation'):
                 layer_input = comp.activation(layer_input)
+            if self.debug:
+                print(name, layer_input.data)
                 
         return layer_input 
 
     def save(self, folder):
+        if not os.path.exists(folder):
+            os.makedirs(folder)
+
         self.to_cpu()
         fout_cfg = open(os.path.join(folder, 'nnet_struct.cfg'), 'w')
         fout_cfg.write(self.structure + '\n')
         idx = 0
         for name, comp in self._comp_holder.items():
             fname = os.path.join(folder, name)
-            if 'w2vec' not in fname:
+            if 'w2vec' not in name:
                 comp.save(fname)
                 fout_cfg.write(name + '|||' + fname + '\n')
             idx += 1
@@ -164,73 +179,9 @@ class NNET_Model(chainer.Chain):
         nnet_model = NNET_Model.parse_structure(nnet_struct)
         
         for name_comp in nnet_cfg[1:]:
+            # print('Loading', name_comp)
             name, fin_comp = name_comp.strip().split('|||')
             comp = nnet_model[name].load(fin_comp)
             nnet_model[name].copyparams(comp)
         return nnet_model
 
-    # def forward(self, x, train=True, gpu=None):
-        # if gpu is not None:
-            # x = cuda.cupy.asarray(x)
-        # x = chainer.Variable(x, volatile=not train)
-        # layer_input = x
-        # for name, comp in self.comps.items():
-            # layer_input = comp(layer_input)
-        # return layer_input 
-
-    # def get_layer(self, layer_idx):
-        # """Get layer component (zero-based)"""
-        # idx = 0
-        # for name, comp in self.comps.items():
-            # if idx == layer_idx:
-                # return name, comp
-            # idx += 1
-    
-    # def __deepcopy__(self, memo):
-        # new_model = NNET_Model.parse_structure(self.structure)
-        # new_model.name = self.name
-        # new_model.is_init = self.is_init
-        # new_model.lr = self.lr
-        # for name, comp in self.comps.items():
-            # new_comp = copy.deepcopy(comp)
-            # setattr(new_model, name, new_comp)
-            # new_model.comps[name] = new_comp
-        # return new_model
-
-    # def save(self, folder):
-        # self.to_cpu()
-        # fout_cfg = open(os.path.join(folder, 'nnet_struct.cfg'), 'w')
-        # fout_cfg.write(self.structure + '\n')
-
-        # idx = 0
-        # for name, comp in self.comps.items():
-            # fname = os.path.join(folder, 'c-%d' % idx)
-            # is_save = comp.save(fname)
-            # if is_save:
-                # fout_cfg.write(name + ':' + fname + '\n')
-            # idx += 1
-        # fout_cfg.close()
-
-    # @classmethod
-    # def load(cls, folder):
-        # nnet_cfg = open(os.path.join(folder, 'nnet_struct.cfg'), 'r').readlines()
-        # nnet_struct = nnet_cfg[0].strip()
-        # nnet_model = NNET_Model.parse_structure(nnet_struct)
-        
-        # for name_comp in nnet_cfg[1:]:
-            # name, fin_comp = name_comp.strip().split(':')
-            # comp = nnet_model.comps[name].load(fin_comp)
-            # nnet_model.reassign_comp(name, comp)
-        # return nnet_model
-
-    # @classmethod
-    # def parse_structure(cls, nnet_struct):
-        # nnet_model = cls()
-        # nnet_model.structure = nnet_struct
-        # for sid, struct in enumerate(nnet_struct.split(':')):
-            # comp = parse_component(struct)
-            # struct_name = struct + "-c%d" % sid
-            # for idx, param in enumerate(comp.get_params()):
-                # setattr(nnet_model, struct_name + '-' + str(idx), param)
-            # nnet_model.comps[struct_name] = comp
-        # return nnet_model

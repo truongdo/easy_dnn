@@ -148,18 +148,6 @@ class Test_NNET_Model(unittest.TestCase):
         np.testing.assert_equal(output_after_train, output_after_load)
 
 
-
-    # def test_NNET_W2vec(self):
-        # np.random.seed(0)
-        # struct = 'w2vec(/project/nakamura-lab01/Work/truong-dq/chainer/vidnn/exp/word2vec_truecase_200/vectors.bin):lstm(200-3):linear(3-2)'
-        # nnet = NNET_Model.parse_structure(struct)
-        # nnet.save('test_save_model_w2vec')
-        # another = NNET_Model.load('test_save_model_w2vec')
-
-        # inp = chainer.Variable(np.asarray([1], dtype=np.int32))
-
-        # np.testing.assert_equal(nnet(inp).data, another(inp).data)
-
     def tearDown(self):
         pass
 

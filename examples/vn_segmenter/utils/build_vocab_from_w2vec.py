@@ -9,6 +9,7 @@
 """
 
 """
+from __future__ import print_function
 import sys
 import codecs
 import operator
@@ -23,7 +24,14 @@ def load_from_w2vec(fname):
     in_size, out_size = model.syn0.shape
     vocab = OrderedDict()
     for w, v in model.vocab.items():
-        vocab[w] = v.index
+        try:
+            if ('\xc2\xa0' in w.encode('utf-8')) or ('\xe3\x80\x80' in w.encode('utf-8')):
+                continue
+            vocab[w] = v.index
+        except:
+            print('WARN: bad word:', end='')
+            print(w)
+            pass
     vocab[u"<unk>"] = -1
 
     for p in list(string.punctuation):
@@ -45,18 +53,20 @@ for line in codecs.open(train_file, 'r', 'utf-8'):
     if not t in t_dic:
         t_dic[t] = len(t_dic)
 
-
 fout_dic = codecs.open(out_dir + '/words.int', 'w', 'utf-8')
 error = 0
 for w, wid in w_dic.items():
-    w = w.strip()
-    if not w or  len(w.split()) != 1:
-        continue
-    try: 
-        w = smart_unicode(w)
-        fout_dic.write("%s %d\n" % (smart_unicode(w), wid))
-    except:
-        error += 1
+    w = smart_unicode(w)
+    fout_dic.write("%s %d\n" % (smart_unicode(w), wid))
+    # if not w or  len(w.split()) != 1:
+        # continue
+    # try: 
+        # w = smart_unicode(w)
+        # fout_dic.write("%s %d\n" % (smart_unicode(w), wid))
+    # except:
+        # print('WARN: bad word')
+        # print(w)
+        # error += 1
 fout_tag = codecs.open(out_dir + '/tags.int', 'w', 'utf-8')
 for t, tid in t_dic.items():
     fout_tag.write("%s %d\n" % (t, tid))
