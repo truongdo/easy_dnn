@@ -115,17 +115,11 @@ def get_pading(pad_info):
         if ',' in inp_pad:
             inp_pad = np.fromstring(inp_pad, dtype=np.float32, sep=',')
         else:
-            if inp_pad.isdigit():
-                inp_pad = int(inp_pad)
-            else:
-                inp_pad = float(inp_pad)
+            inp_pad = int(inp_pad)
         if ',' in tgt_pad:
             tgt_pad = np.fromstring(tgt_pad, dtype=np.float32, sep=',')
         else:
-            if tgt_pad.isdigit():
-                tgt_pad = int(tgt_pad)
-            else:
-                tgt_pad = float(tgt_pad)
+            tgt_pad = int(tgt_pad)
         return (inp_pad, tgt_pad)
     else:
         return None

@@ -13,6 +13,7 @@ import unittest
 import chainer
 import chainer.links as L
 import chainer.functions as F
+import chainer.cuda as cuda
 import chainer.optimizers as optimizers
 import os
 import shutil
@@ -89,17 +90,20 @@ class Test_NNET_Model(unittest.TestCase):
         np.testing.assert_equal(nnet(inp).data, nnet2(inp).data)
 
     def test_NNET_train(self):
-        struct = 'w2vec(/project/nakamura-lab01/Work/truong-dq/chainer/vidnn/exp/word2vec_truecase_200/vectors.bin):lstm(200-2):linear(2-2)'
-        # struct = 'embed(2-200):lstm(200-2):linear(2-2)'
+        xp = cuda.cupy
+
+        # struct = 'w2vec(/project/nakamura-lab01/Work/truong-dq/chainer/vidnn/exp/word2vec_truecase_200/vectors.bin):lstm(200-2):linear(2-2)'
+        struct = 'embed(2-200):lstm(200-2):linear(2-2)'
         nnet = NNET_Model.parse_structure(struct)
+        nnet.to_gpu()
 
         # Testing variable
-        test_var = chainer.Variable(np.asarray([1], dtype=np.int32))
-        output_before_train = nnet(test_var).data
+        test_var = chainer.Variable(xp.asarray([1], dtype=np.int32))
+        output_before_train = cuda.to_cpu(nnet(test_var).data)
 
 
-        inp = chainer.Variable(np.asarray([1], dtype=np.int32))
-        target = chainer.Variable(np.asarray([0], dtype=np.int32))
+        inp = chainer.Variable(xp.asarray([1], dtype=np.int32))
+        target = chainer.Variable(xp.asarray([0], dtype=np.int32))
         output = nnet(inp)
         loss = F.softmax_cross_entropy(output, target)
         optimizer = optimizers.SGD(lr=0.1)
@@ -108,8 +112,8 @@ class Test_NNET_Model(unittest.TestCase):
         loss.backward()
         optimizer.update()
         
-        inp = chainer.Variable(np.asarray([0], dtype=np.int32))
-        target = chainer.Variable(np.asarray([0], dtype=np.int32))
+        inp = chainer.Variable(xp.asarray([0], dtype=np.int32))
+        target = chainer.Variable(xp.asarray([0], dtype=np.int32))
         output = nnet(inp)
         loss = F.softmax_cross_entropy(output, target)
         optimizer = optimizers.SGD(lr=0.1)
@@ -120,28 +124,30 @@ class Test_NNET_Model(unittest.TestCase):
 
         
         nnet.save('test_output')
+        nnet.to_gpu()
         nnet_2 = NNET_Model.load('test_output')
+        nnet_2.to_gpu()
         nnet.forget_history()
         nnet_2.forget_history()
 
-        np.testing.assert_equal(nnet[0][1].W.data, nnet_2[0][1].W.data)
-        np.testing.assert_equal(nnet[1][1].upward.W.data, nnet_2[1][1].upward.W.data)
-        np.testing.assert_equal(nnet[1][1].lateral.W.data, nnet_2[1][1].lateral.W.data)
-        np.testing.assert_equal(nnet[1][1].upward.b.data, nnet_2[1][1].upward.b.data)
+        np.testing.assert_equal(cuda.to_cpu(nnet[0][1].W.data), cuda.to_cpu(nnet_2[0][1].W.data))
+        np.testing.assert_equal(cuda.to_cpu(nnet[1][1].upward.W.data), cuda.to_cpu(nnet_2[1][1].upward.W.data))
+        np.testing.assert_equal(cuda.to_cpu(nnet[1][1].lateral.W.data), cuda.to_cpu(nnet_2[1][1].lateral.W.data))
+        np.testing.assert_equal(cuda.to_cpu(nnet[1][1].upward.b.data), cuda.to_cpu(nnet_2[1][1].upward.b.data))
 
-        output_after_train = nnet(test_var).data
-        output_after_load = nnet_2(test_var).data
+        output_after_train = cuda.to_cpu(nnet(test_var).data)
+        output_after_load = cuda.to_cpu(nnet_2(test_var).data)
         
        
         after_first_layer_nnet = nnet[0][1](test_var)
         after_first_layer_nnet_2 = nnet_2[0][1](test_var)
-        np.testing.assert_equal(after_first_layer_nnet.data, after_first_layer_nnet_2.data)
+        np.testing.assert_equal(cuda.to_cpu(after_first_layer_nnet.data), cuda.to_cpu(after_first_layer_nnet_2.data))
         
         after_first_layer_nnet.volatile = False
         after_first_layer_nnet_2.volatile = False
         after_second_layer_nnet = nnet[1][1](after_first_layer_nnet)
         after_second_layer_nnet_2 = nnet_2[1][1](after_first_layer_nnet_2)
-        np.testing.assert_equal(after_second_layer_nnet.data, after_second_layer_nnet_2.data)
+        np.testing.assert_equal(cuda.to_cpu(after_second_layer_nnet.data), cuda.to_cpu(after_second_layer_nnet_2.data))
         
         assert (output_before_train != output_after_train).any()
         assert (output_before_train != output_after_load).any()
